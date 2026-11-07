@@ -98,7 +98,7 @@ export default function CampaignPage({ params }: { params: { id: string } }) {
               ))}
             </div>
           </div>
-        </div>
+        </aside>
       </div>
     </main>
   );
