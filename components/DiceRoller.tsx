@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { rollDice } from '@/lib/dice';
 import { Dices } from 'lucide-react';
 
-export default function DiceRoller({ campaignId }: { campaignId: string }) {
+export default function DiceRoller() {
   const [input, setInput] = useState('');
   const [lastRoll, setLastRoll] = useState<{result: number, detail: string} | null>(null);
 
@@ -22,8 +22,8 @@ export default function DiceRoller({ campaignId }: { campaignId: string }) {
     try {
       const res = rollDice(input);
       setLastRoll(res);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Não foi possível rolar os dados.');
     }
   };
 

@@ -9,7 +9,7 @@ const ATTRIBUTES = [
   { label: 'VIGOR', key: 'VIG', color: 'border-orange-500' },
 ];
 
-export default function AttributeGrid({ values, onUpdate }: { values: any, onUpdate: (key: string, val: number) => void }) {
+export default function AttributeGrid({ values, onUpdate }: { values: Record<string, number>, onUpdate: (key: string, val: number) => void }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
       {ATTRIBUTES.map((attr) => (

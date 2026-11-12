@@ -1,54 +1,72 @@
 'use client';
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { database, errorMessage } from '@/lib/workspace';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
-
-  const handleAuth = async () => {
-    const { error } = isSignUp
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) alert(error.message);
-    else router.push('/campaign/dashboard');
-  };
-
-  return (
-    <div className="min-h-screen bg-[#0f0f12] flex items-center justify-center p-4">
-      <div className="bg-[#1a1a20] p-8 rounded-2xl border border-zinc-800 w-full max-w-md shadow-2xl">
-        <h1 className="text-3xl font-black text-white text-center mb-8 uppercase tracking-tighter">
-          Ordem <span className="text-rose-600">VTT</span>
-        </h1>
-        <div className="space-y-4">
-          <input
-            type="email" placeholder="E-mail"
-            className="w-full p-3 bg-[#0f0f12] border border-zinc-800 rounded text-white outline-none focus:ring-2 ring-rose-600"
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            type="password" placeholder="Senha"
-            className="w-full p-3 bg-[#0f0f12] border border-zinc-800 rounded text-white outline-none focus:ring-2 ring-rose-600"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button
-            onClick={handleAuth}
-            className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded transition-all active:scale-95"
-          >
-            {isSignUp ? 'Criar Conta' : 'Entrar'}
-          </button>
-          <p
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-center text-zinc-500 text-sm cursor-pointer hover:text-zinc-300"
-          >
-            {isSignUp ? 'Já tem conta? Faça login' : 'Não tem conta? Cadastre-se'}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  const [signup, setSignup] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      const db = database();
+      db.auth.getSession().then(({ data, error }) => {
+        if (error) setError(errorMessage(error));
+        else if (data.session) router.replace('/campaign/dashboard');
+      }).catch(e => setError(errorMessage(e)));
+      const { data } = db.auth.onAuthStateChange((_event, session) => {
+        if (session) router.replace('/campaign/dashboard');
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+    }).catch(e => { if (active) setError(errorMessage(e)); });
+    return () => { active = false; unsubscribe?.(); };
+  }, [router]);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get('email')).trim();
+    const password = String(form.get('password'));
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const db = database();
+      const result = signup
+        ? await db.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/login` } })
+        : await db.auth.signInWithPassword({ email, password });
+      if (result.error) {
+        const text = result.error.message;
+        throw new Error(/invalid login/i.test(text) ? 'E-mail ou senha incorretos.' : /email not confirmed/i.test(text) ? 'Confirme seu e-mail antes de entrar.' : /rate limit/i.test(text) ? 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' : text);
+      }
+      if (result.data.session) router.replace('/campaign/dashboard');
+      else setMessage('Confira seu e-mail e abra o link de confirmação. Depois volte aqui para entrar.');
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setBusy(false); }
+  }
+  return <main className="auth-page"><section className="auth-story">
+    <Link className="brand" href="/">ORDEM <span>VTT</span></Link>
+    <p className="eyebrow">SEU ESPAÇO DE PREPARAÇÃO</p>
+    <h1>A história começa<br />do seu lado da mesa.</h1>
+    <p>Reúna personagens, organize os lugares e mantenha suas anotações por perto. Menos abas abertas, mais tempo para narrar.</p>
+    <div className="auth-caption">CAMPANHAS · NPCs · LOCAIS · ANOTAÇÕES</div>
+  </section><section className="auth-panel">
+    <form onSubmit={submit} className="panel auth-form">
+      <p className="eyebrow">ESCUDO DO MESTRE</p>
+      <h2>{signup ? 'Crie seu espaço' : 'Bem-vindo de volta'}</h2>
+      <p className="muted">{signup ? 'Use seu e-mail para guardar suas campanhas.' : 'Entre para continuar preparando sua próxima sessão.'}</p>
+      <label>E-mail<input name="email" type="email" required autoComplete="email" maxLength={254} /></label>
+      <label>Senha<input name="password" type="password" required minLength={signup ? 8 : 1} maxLength={128} autoComplete={signup ? 'new-password' : 'current-password'} /></label>
+      {signup && <p className="hint">Use pelo menos 8 caracteres.</p>}
+      {error && <p role="alert" className="error">{error}</p>}
+      {message && <p role="status" className="success">{message}</p>}
+      <button className="primary" disabled={busy}>{busy ? 'Aguarde…' : signup ? 'Criar conta' : 'Entrar'}</button>
+      <button type="button" className="text-button" disabled={busy} onClick={() => { setSignup(!signup); setError(''); setMessage(''); }}>{signup ? 'Já tenho conta' : 'Ainda não tenho conta'}</button>
+    </form>
+    <p className="hint">Suas anotações ficam disponíveis somente na sua conta.</p>
+  </section></main>;
 }
