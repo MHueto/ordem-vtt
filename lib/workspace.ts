@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { NpcSheet } from './npc-sheet';
 let client: SupabaseClient | undefined;
 export function database() {
   if (client) return client;
@@ -14,6 +15,7 @@ export type Entry = {
   id: string; owner_id: string; campaign_id: string; kind: Kind; name: string;
   content: string; occupation: string; appearance: string; role: string; desire: string;
   bonds: string; location_id: string | null; archived_at: string | null; updated_at: string;
+  sheet?: NpcSheet | null;
 };
 export type EntryDraft = Pick<Entry, 'kind' | 'name' | 'content' | 'occupation' | 'appearance' | 'role' | 'desire' | 'bonds' | 'location_id'>;
 export const labels: Record<Kind, string> = { npc: 'NPCs', location: 'Locais', note: 'Anotações' };
